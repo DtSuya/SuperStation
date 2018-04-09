@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExecuteSStoDB", "ExecuteSStoDB\ExecuteSStoDB.csproj", "{EDD5C413-0455-4781-A08A-226DFEEC0C8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuperStation", "SuperStationToDB\SuperStation.csproj", "{FE5A7AFF-74B4-43EE-94D9-6DDCF377FBB1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EDD5C413-0455-4781-A08A-226DFEEC0C8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDD5C413-0455-4781-A08A-226DFEEC0C8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDD5C413-0455-4781-A08A-226DFEEC0C8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDD5C413-0455-4781-A08A-226DFEEC0C8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE5A7AFF-74B4-43EE-94D9-6DDCF377FBB1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE5A7AFF-74B4-43EE-94D9-6DDCF377FBB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE5A7AFF-74B4-43EE-94D9-6DDCF377FBB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE5A7AFF-74B4-43EE-94D9-6DDCF377FBB1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

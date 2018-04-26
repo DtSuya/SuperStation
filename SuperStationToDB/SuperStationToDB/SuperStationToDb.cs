@@ -16,168 +16,196 @@ namespace Utility.SuperStation
         static Database m_Database;
         public string Station { get; set; }
         public string City { get; set; }
-        public string Type { get; set; }
+        string type;
+        DataTable Table_Item;
+        DateTime InitialLST { get; set; }
+
+        public string Type 
+        {
+            get
+            {
+                return type;
+            }
+            set 
+            {
+                type = value;
+
+                //原始在update中，每次更新时获得
+                if(value == "VOCs")
+                    Table_Item = m_Database.GetDataTable("select * from D_VOCItem");
+                else
+                    Table_Item = m_Database.GetDataTable("select * from D_ItemCode");
+            }
+        }
 
         public SuperStation(string connectionstrings) {
             ConnectionStrings = connectionstrings;
             m_Database = new Database(ConnectionStrings);
         }
 
-        public int InsertToDB( DateTime LST, string filepath)
+        public int InsertToDB(string filepath)
         {
             try
             {
-                if (Type == "Hmetal")
-                {
-                    string file = filepath + LST.ToString("yyyy") + "/" + LST.ToString("yyyyMMdd") + "/" + LST.ToString("yyyyMMddHHmm") + ".txt";
-                    if (File.Exists(file))
-                    {
-                        if (LST.Minute > 30)
-                            LST = Convert.ToDateTime(LST.ToString("yyyy-MM-dd HH:00:00")).AddHours(1);
-                        else
-                            LST = Convert.ToDateTime(LST.ToString("yyyy-MM-dd HH:00:00"));
-                        Update.UpdateDb(ToCSV(file, ','), Type, LST, City, Station);
-                    }
-                }
-                else if (Type == "颗粒")
+                if (Type == "VOCs" || Type == "颗粒")
                 {
                     DataTable Table = ToCSV(filepath, ',');
                     foreach (DataRow row in Table.Rows)
                     {
-                        Update.UpdateVarDb(row, Station, Type, City, "T_SuperStation");
-                    }
-                }
-                else if (Type == "VOCs")
-                {
-                    DataTable Table = ToCSV(filepath, ',');
-                    foreach (DataRow row in Table.Rows)
-                    {
-                        Update.UpdateVOCDb(row, Station, Type, City, "T_SuperStation");
+                        UpdateVarDb(row, "T_SuperStation");
                     }
                 }
                 else if (Type == "OMI")
                 {
-                    ExternalTable.O3Lidar O3Leida = new ExternalTable.O3Lidar(m_Database);
-                    DataTable sources = O3Leida.MonthColumnO3toDb(filepath, Type, Station, City);
-                    foreach (DataRow row in sources.Rows)
+                    O3Lidar O3Leida = new O3Lidar(m_Database);
+                    DataTable Table = O3Leida.MonthColumnO3toDb(filepath, Type, Station, City);
+                    foreach (DataRow row in Table.Rows)
                     {
-                        Update.UpdateVarDb(row, Station, Type, City, "T_SuperStation");
+                        UpdateVarDb(row, "T_SuperStation");
                     }
                 }
-                //新增*
-                #region type：BC
-
-                else if (Type == "BC")
+                else
                 {
-                    BC IR1 = new BC();
-                    //string folder = @"D:\1上海地听\环科院\超级站黑炭\Data_BC";//数据源路径
-                    DateTime maxtime;
-                    try
-                    {
-                        maxtime =
-                            Convert.ToDateTime(
-                                m_Database.GetFirstValue("select max(StartTime) from  T_SuperStationmin where  Type='" +
-                                                         Type + "'"));
-                    }
-                    catch
-                    {
-                        maxtime = LST.AddHours(-72);
-                    } //自定义第一次入库时间
-                    //分钟数据入库
-                    DataTable IR1soueces = IR1.GetIR1source(filepath, maxtime);
-                    foreach (DataRow row in IR1soueces.Rows)
-                    {
-                        DateTime start = Convert.ToDateTime(row[0].ToString());
-                        Update.UpdateVarDb(row, Station, Type, City, "T_SuperStationmin");
-                        string strlasttime =
-                            m_Database.GetFirstValue("select max(StartTime) from  T_SuperStation where  Type='" + Type +
-                                                     "'");
-                        //小时数据入库
-                        DateTime lasttime = Convert.ToDateTime(maxtime.AddHours(-72).ToString("yyyy-MM-dd HH:00:00"));
-                        if (strlasttime != "")
-                            lasttime = Convert.ToDateTime(strlasttime);
-                        for (DateTime dtime = lasttime.AddHours(1);
-                            dtime < Convert.ToDateTime(start.ToString("yyyy-MM-dd HH:00:00"));
-                            dtime = dtime.AddHours(1))
-                        {
-                            string Str_SQL = "select '" + dtime + "' as [StartTime]  ,'" + dtime.AddHours(1) +
-                                             "' as [EndTime]  ,[City]  ,[Station]  ,[Item] ,avg([Value]) as [Value]  ,'' as [Quality]  ,[Type]  ,avg([DValue]) as [DValue]  ,'' as [OPCode] ,'' as [LMark]  ,'' as [HMark] ,'' as [State] from T_SuperStationmin where convert(varchar(13),StartTime,120)+':00:00'='" +
-                                             dtime.ToString("yyyy-MM-dd HH:00:00") + "'  and   Type='" + Type +
-                                             "'  and  [DValue] !=-99 and  [Value]!=-99 group by  [City]  ,[Station], [Type],[Item] ";
-
-                            DataTable Table_Data = m_Database.GetDataset(Str_SQL).Tables[0];
-                            if (Table_Data.Rows.Count != 0)
-                                Update.UpdateDb(Table_Data, Type, dtime, City, Station);
-                            //lasttime = dtime;
-                        }
-                    }
-                }
-                #endregion
-
-                else if (Type == "Sourcelist")
-                {
-                    try
-                    {
-                        string insertsql =
-                            "insert into T_SourceList ([Year]  ,[Code]  ,[ParameterID]  ,[TypeCode]   ,[CLType]  ,[EcoCode]  ,[Value]) values ";
-                        DataTable Table = ToCSV(filepath, ',');
-                        int typecode = (int)Enum.Parse(typeof(TypeCode), Type);
-                        int i = 0;
-                        foreach (DataRow row in Table.Rows)
-                        {
-                            int year = Convert.ToInt32(row[0]);
-                            City = row[1].ToString();
-                            string province = row[2].ToString();
-                            int code = GetCityCode(City, province);
-                            int cltype = -1;
-                            int ecocode = -1;
-                            for (int j = 3; j < Table.Columns.Count; j++)
-                            {
-                                if (Table.Columns[j].ColumnName.Contains("Column"))
-                                    continue;
-                                double value = 0;
-                                try
-                                {
-                                    value = Convert.ToDouble(row[j]);
-                                }
-                                catch
-                                {
-                                }
-                                int parameterid = GetParameterID(Table.Columns[j].ColumnName);
-                                insertsql += string.Format("({0},{1},{2},{3},{4},{5},{6}),", year, code, parameterid,
-                                    typecode, cltype, ecocode, value);
-                                i++;
-                                if (i > 900)
-                                {
-                                    m_Database.Execute(insertsql.Remove(insertsql.Length - 1));
-                                    insertsql =
-                                        "insert into T_SourceList ([Year]  ,[Code]  ,[ParameterID]  ,[TypeCode]   ,[CLType]  ,[EcoCode]  ,[Value]) values ";
-                                    i = 0;
-                                }
-                            }
-                        }
-                        m_Database.Execute(insertsql.Remove(insertsql.Length - 1));
-                    }
-                    catch
-                    {
-                    }
+                    LogManager.WriteLog(LogFile.Warning, "未知数据源：" + Type);
+                    return -1;
                 }
                 return 2;
             }
-            catch { return -1; }
+            catch (Exception ex)
+            {
+                LogManager.WriteLog(ex);
+                return -1; 
+            }
         }
 
-        private class Update
+        public int InsertToDBHmetal(DateTime LST, string filepath)
         {
-            /// <summary>
-            /// 超级站同表入库
-            /// </summary>
-            /// <param name="result"></param>
-            /// <param name="type"></param>
-            /// <param name="lst"></param>
-            /// <param name="city"></param>
-            /// <param name="station"></param>
-            public static void UpdateDb(DataTable result, string type, DateTime lst, string city, string station)
+            try
+            {
+                //if (Type == "Hmetal")
+                //{
+                    string file = filepath + LST.ToString("yyyy") + "/" + LST.ToString("yyyyMMdd") + "/" + LST.ToString("yyyyMMddHHmm") + ".txt";
+                    if (File.Exists(file))
+                    {
+                        if (LST.Minute > 30)
+                            InitialLST = Convert.ToDateTime(LST.ToString("yyyy-MM-dd HH:00:00")).AddHours(1);
+                        else
+                            InitialLST = Convert.ToDateTime(LST.ToString("yyyy-MM-dd HH:00:00"));
+                        DataTable Table = ToCSV(file, ',');
+                        UpdateDb(Table, Type, InitialLST, City, Station);
+                    }
+                //}
+                return 2;
+            }
+            catch (Exception ex)
+            {
+                LogManager.WriteLog(ex);
+                return -1;
+            }
+        }
+
+        public int InsertToDBMin(DateTime LST, string filepath)
+        {
+            try
+            {
+                InitialLST = LST.AddHours(-72);
+                InitialLST = GetInitialStarttime("T_SuperStationmin");
+                DataTable minsource;
+                MinuteSource min = new MinuteSource();
+                string singleColname;
+                if (Type == "BC")
+                {
+                    singleColname = "IR_880nm";
+                }
+                else if (Type == "ScatCo")
+                {
+                    singleColname = "SP2";//σsp-525nm
+                }
+                else
+                {
+                    LogManager.WriteLog(LogFile.Warning, "未知数据源：" + Type);
+                    return -1;
+                }
+                minsource = min.GetMinsource(Type, filepath, InitialLST, singleColname);
+
+                if (minsource != null)
+                    foreach (DataRow row in minsource.Rows)
+                    {
+                        //分钟数据入库
+                        UpdateVarDb(row, "T_SuperStationmin");
+                        //小时数据入库
+                        InitialLST = GetInitialStarttime("T_SuperStation");
+                        DateTime minutime = Convert.ToDateTime(row[0].ToString());
+                        for (DateTime stime = InitialLST; stime < Convert.ToDateTime(minutime.ToString("yyyy-MM-dd HH:00:00"));  
+                            stime = stime.AddHours(1))
+                        {
+                            string Str_SQL = string.Format(@"select '{0}' as [StartTime],  '{1}' as [EndTime],  [City],  [Station]  ,[Item], 
+                                avg([Value]) as [Value],  '' as [Quality],  [Type],  avg([DValue]) as [DValue],  '' as [OPCode],  '' as [LMark],  '' as [HMark], '' as [State] 
+                                from T_SuperStationmin where convert(varchar(13),StartTime,120)+':00:00'='{2}'  and  Type='{3}'  and  [DValue] !=-99 and  [Value]!=-99 
+                                group by  [City]  ,[Station], [Type],[Item] ",
+                                stime, stime.AddHours(1),stime.ToString("yyyy-MM-dd HH:00:00"), Type);
+                            DataTable Table_hour = m_Database.GetDataTable(Str_SQL);
+                            if (Table_hour.Rows.Count != 0)
+                                UpdateDb(Table_hour, Type, stime, City, Station);
+                        }
+                    }
+                return 2;
+            }
+            catch (Exception ex)
+            {
+                LogManager.WriteLog(ex);
+                return -1;
+            }
+        }
+
+        public int InsertToDBHour(DateTime LST, string filepath)
+        {
+            try
+            {
+                InitialLST = LST.AddHours(-72);
+                InitialLST = GetInitialStarttime("T_SuperStation");
+                DataTable Table;
+                if (Type == "OCEC")
+                {
+                    OCEC ocec = new OCEC();
+                    Table = ocec.GetOCECSource(filepath, InitialLST);
+                }
+                else if (Type == "Spectra")
+                {
+                    Spectra SPAMS = new Spectra();
+                    Table = SPAMS.GetSPAMSsource(filepath, InitialLST);
+                }
+                else
+                {
+                    LogManager.WriteLog(LogFile.Warning, "未知数据源：" + Type);
+                    return -1;
+                }
+                if(Table != null)
+                    foreach (DataRow row in Table.Rows)
+                    {
+                        UpdateVarDb(row, "T_SuperStation");
+                    }
+                return 2;
+            }
+            catch (Exception ex)
+            {
+                LogManager.WriteLog(ex);
+                return -1;
+            }
+        }
+
+        #region 同表Update
+        /// <summary>
+        /// 超级站同表入库
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="type"></param>
+        /// <param name="lst"></param>
+        /// <param name="city"></param>
+        /// <param name="station"></param>
+        private void UpdateDb(DataTable result, string type, DateTime lst, string city, string station)
+        {
+            try
             {
                 string deletesql = string.Format("delete  T_SuperStation where StartTime='{0}' and  City='{1}' and  Station='{2}' and  Type='{3}'", lst, city, station, type);
                 m_Database.Execute(deletesql);
@@ -188,147 +216,69 @@ namespace Utility.SuperStation
                     {
                         sqlinsert = sqlinsert + string.Format("insert into T_SuperStation (StartTime,EndTime,City,Station,Item,Value,Quality,Type,DValue, OPCode) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}',{8},'{9}');", lst, lst.AddHours(1), dr[2], dr[3], dr[4], dr[5], dr[6], dr[7], dr[8], dr[9]);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        LogManager.WriteLog("超级站同表入库", ex);
+                    }
                 }
                 m_Database.Execute(sqlinsert);
             }
-            /// <summary>
-            /// 雷达同表入库
-            /// </summary>
-            /// <param name="result"></param>
-            /// <param name="type"></param>
-            /// <param name="lst"></param>
-            /// <param name="city"></param>
-            /// <param name="station"></param>
-            public static void InsertLidarToDB(DataTable result, string type, DateTime lst)
+            catch (Exception ex)
             {
-                try
-                {
-                    string deletesql = string.Format("delete  T_Lidar where LST='{0}' and  type like '{1}%' ", lst, type);
-                    m_Database.Execute(deletesql);
-                    string sqlinsert = "";
-                    foreach (DataRow dr in result.Rows)
-                    {
-
-                        sqlinsert = sqlinsert + string.Format("insert into T_Lidar  values({0},'{1}',{2},'{3}');", dr[0], lst, dr[1], type + dr[2]);
-
-                    }
-                    m_Database.Execute(sqlinsert);
-                }
-                catch { }
+                LogManager.WriteLog("超级站同表入库", ex);
             }
-            /// <summary>
-            /// 更新颗粒数据
-            /// </summary>
-            /// <param name="row"></param>
-            /// <param name="station"></param>
-            /// <param name="type"></param>
-            public static void UpdateVarDb(DataRow row, string station, string type, string city,string tablename)
+        }
+        /// <summary>
+        /// 雷达同表入库
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="type"></param>
+        /// <param name="lst"></param>
+        private void InsertLidarToDB(DataTable result, string type, DateTime lst)
+        {
+            try
             {
-                DateTime start = Convert.ToDateTime(row[0].ToString());
-                DateTime end = Convert.ToDateTime(row[0].ToString());
-                Dictionary<string, SuperItem> Items = new Dictionary<string, SuperItem>();
-
-                DataTable Table_Item = m_Database.GetDataset("select * from D_ItemCode").Tables[0];
-                int maxdm = Convert.ToInt32(m_Database.GetFirstValue("  select MAX(DM) from  D_ItemCode"));
-
-                int superstationCount = Convert.ToInt32(m_Database.GetFirstValue("if exists (SELECT TOP 1 1 FROM " + tablename + " where StartTime = '" + start + "' and  Type ='" + type + "' and Station='" + station + "' ) SELECT 1 ELSE SELECT 0"));
-                if (superstationCount != 0)
-                    m_Database.Execute("delete " + tablename + " where StartTime = '" + start + "' and  Type ='" + type + "' and Station='" + station + "'");
-
-                for (int i = 1; i < row.Table.Columns.Count; i++)
-                {
-                    string colummname = row.Table.Columns[i].ColumnName;
-                    if (colummname.Contains("Column"))
-                        continue;
-                    int itemcode = -1;
-                    double value = Convert.ToDouble(row[i].ToString() != "" ? row[i].ToString() : "999");
-                    if (value == 999)
-                        value = -99;
-                    try
-                    {
-                        itemcode = int.Parse(Table_Item.Select("MC = '" + colummname + "'")[0]["DM"].ToString());
-                    }
-                    catch
-                    {
-                        maxdm = maxdm + 1;
-                        string insertsql = " insert into D_ItemCode ([DM],[MC]  ,[Type])  values (" + maxdm + ",'" + colummname + "','" + type + "') ; insert into D_ModelAnalysis_Item ([DM],[MC]  ,[DP])  values (" + maxdm + ",'" + colummname + "','" + type + "')";
-                        m_Database.Execute(insertsql);
-                        itemcode = maxdm;
-                    }
-                    SuperItem item = new SuperItem("", value, itemcode, "");
-                    Items.Add(colummname, item);
-                }
+                string deletesql = string.Format("delete  T_Lidar where LST='{0}' and  type like '{1}%' ", lst, type);
+                m_Database.Execute(deletesql);
                 string sqlinsert = "";
-                foreach (SuperItem item in Items.Values)
+                foreach (DataRow dr in result.Rows)
                 {
-                    sqlinsert = sqlinsert + string.Format("insert into " + tablename + " (StartTime,EndTime,City,Station,Item,Value,Quality,Type,DValue) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}',{8});", start, end, city, station, item.Item, item.Value, item.Quality, type, item.Value);
+
+                    sqlinsert = sqlinsert + string.Format("insert into T_Lidar  values({0},'{1}',{2},'{3}');", dr[0], lst, dr[1], type + dr[2]);
+
                 }
                 m_Database.Execute(sqlinsert);
             }
-            /// <summary>
-            /// 更新颗粒数据
-            /// </summary>
-            /// <param name="row"></param>
-            /// <param name="station"></param>
-            /// <param name="type"></param>
-            public static void UpdateVOCDb(DataRow row, string station, string type, string city, string tablename)
+            catch (Exception ex)
             {
-                DateTime start = Convert.ToDateTime(row[0].ToString());
-                DateTime end = Convert.ToDateTime(row[0].ToString());
-                Dictionary<string, SuperItem> Items = new Dictionary<string, SuperItem>();
-
-                DataTable Table_Item = m_Database.GetDataset("select * from D_VOCItem").Tables[0];
-                int maxdm = Convert.ToInt32(m_Database.GetFirstValue("  select MAX(DM) from  D_ItemCode"));
-
-                int superstationCount = Convert.ToInt32(m_Database.GetFirstValue("if exists (SELECT TOP 1 1 FROM " + tablename + " where StartTime = '" + start + "' and  Type ='" + type + "' and Station='" + station + "' ) SELECT 1 ELSE SELECT 0"));
-                if (superstationCount != 0)
-                    m_Database.Execute("delete " + tablename + " where StartTime = '" + start + "' and  Type ='" + type + "' and Station='" + station + "'");
-
-                for (int i = 1; i < row.Table.Columns.Count; i++)
-                {
-                    string colummname = row.Table.Columns[i].ColumnName;
-                    if (colummname.Contains("Column"))
-                        continue;
-                    int itemcode = -1;
-                    double value = Convert.ToDouble(row[i].ToString() != "" ? row[i].ToString() : "999");
-                    if (value == 999)
-                        value = -99;
-                    try
-                    {
-                        itemcode = int.Parse(Table_Item.Select("Name = '" + colummname + "'")[0]["Item"].ToString());
-                    }
-                    catch
-                    {
-                        maxdm = maxdm + 1;
-                        string insertsql = " insert into D_ItemCode ([DM],[MC]  ,[Type])  values (" + maxdm + ",'" + colummname + "','" + type + "') ; insert into D_ModelAnalysis_Item ([DM],[MC]  ,[DP])  values (" + maxdm + ",'" + colummname + "','" + type + "')";
-                        m_Database.Execute(insertsql);
-                        itemcode = maxdm;
-                    }
-                    SuperItem item = new SuperItem("", value, itemcode, "");
-                    Items.Add(colummname, item);
-                }
-                string sqlinsert = "";
-                foreach (SuperItem item in Items.Values)
-                {
-                    sqlinsert = sqlinsert + string.Format("insert into " + tablename + " (StartTime,EndTime,City,Station,Item,Value,Quality,Type,DValue) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}',{8});", start, end, city, station, item.Item, item.Value, item.Quality, type, item.Value);
-                }
-                m_Database.Execute(sqlinsert);
+                LogManager.WriteLog("雷达同表入库", ex);
             }
-            /// <summary>
-            /// 更外部数据
-            /// </summary>
-            /// <param name="row"></param>
-            /// <param name="station"></param>
-            /// <param name="type"></param>
-            public static void UpdateVarDb(DataTable sources, string station, string type, DateTime time, string tablename)
+        }
+        #endregion
+
+        #region 外表Update
+        /// <summary>
+        /// 更外部数据(单列时段数据)
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="type"></param>
+        /// <param name="lst"></param>
+        /// <param name="city"></param>
+        /// <param name="station"></param>
+        /// <param name="tablename"></param>
+        private void UpdateVarDb(DataTable result, DateTime lst, string tablename)
+        {
+            try
             {
                 Dictionary<string, SuperItem> Items = new Dictionary<string, SuperItem>();
 
-                DataTable Table_Item = m_Database.GetDataset("select * from D_ItemCode").Tables[0];
-                DataTable Table_Parameter = m_Database.GetDataset("select * from [parameter]").Tables[0];
+                DataTable Table_Parameter = m_Database.GetDataTable("select * from [parameter]");
                 int maxdm = Convert.ToInt32(m_Database.GetFirstValue("select MAX(DM) from  D_ItemCode"));
-                foreach (DataRow row in sources.Rows)
+
+                int superstationCount = Convert.ToInt32(m_Database.GetFirstValue("if exists (SELECT TOP 1 1 FROM " + tablename + " where StartTime = '" + lst + "' and  Type ='" + Type + "' and City ='" + City + "' and Station='" + Station + "' ) SELECT 1 ELSE SELECT 0"));
+                if (superstationCount != 0)
+                    m_Database.Execute("delete " + tablename + " where StartTime = '" + lst + "' and  Type ='" + Type + "' and City ='" + City + "' and Station='" + Station + "'");
+                foreach (DataRow row in result.Rows)
                 {
                     double value = Convert.ToDouble(row["value"].ToString());
                     int parameterid = Convert.ToInt32(row["parameterid"].ToString());
@@ -345,9 +295,15 @@ namespace Utility.SuperStation
                     catch
                     {
                         maxdm = maxdm + 1;
-                        string insertsql = " insert into D_ItemCode ([DM],[MC]  ,[Type])  values (" + maxdm + ",'" + mc + "','" + type + "') ";
+                        string insertsql = " insert into D_ItemCode ([DM], [MC], [Type])  values (" + maxdm + ",'" + mc + "','" + Type + "') ";
                         m_Database.Execute(insertsql);
                         itemcode = maxdm;
+                        LogManager.WriteLog(LogFile.SQL, "插入新的ItemCode：" + itemcode + ", MC：" + mc);
+
+                        if (Type == "VOCs")
+                            Table_Item = m_Database.GetDataTable("select * from D_VOCItem");
+                        else
+                            Table_Item = m_Database.GetDataTable("select * from D_ItemCode");
                     }
                     SuperItem item = new SuperItem("", value, itemcode, opcode);
                     Items.Add(mc, item);
@@ -355,11 +311,95 @@ namespace Utility.SuperStation
                 string sqlinsert = "";
                 foreach (SuperItem item in Items.Values)
                 {
-                    sqlinsert = sqlinsert + string.Format("insert into {10} (StartTime,EndTime,City,Station,Item,Value,Quality,Type,OPCode,DValue) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}','{8}',{9});", time, time.AddHours(1), "上海", station, item.Item, item.Value, item.Quality, type, item.Opcode, item.Value, tablename);
+                    sqlinsert = sqlinsert + string.Format("insert into {10} (StartTime,EndTime,City,Station,Item,Value,Quality,Type,OPCode,DValue) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}','{8}',{9});", lst, lst.AddHours(1), City, Station, item.Item, item.Value, item.Quality, Type, item.Opcode, item.Value, tablename);
                 }
                 m_Database.Execute(sqlinsert);
             }
+            catch (Exception ex)
+            {
+                LogManager.WriteLog("超级站外部(时段)数据入库：Type ="+ Type +", StartTime ="+ lst , ex);
+            }
+        }
+        /// <summary>
+        /// 更新外部数据(多列时刻数据)（原：“更颗粒/VOC”合并）
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="type"></param>
+        /// <param name="city"></param>
+        /// <param name="station"></param>
+        /// <param name="tablename"></param>
+        private void UpdateVarDb(DataRow row, string tablename)
+        {
+            try
+            {
+                DateTime start = Convert.ToDateTime(row[0].ToString());
+                DateTime end = Convert.ToDateTime(row[0].ToString());
+                Dictionary<string, SuperItem> Items = new Dictionary<string, SuperItem>();
+                
+                int maxdm = Convert.ToInt32(m_Database.GetFirstValue("select MAX(DM) from  D_ItemCode"));
 
+                int superstationCount = Convert.ToInt32(m_Database.GetFirstValue("if exists (SELECT TOP 1 1 FROM " + tablename + " where StartTime = '" + start + "' and  Type ='" + Type + "' and City ='" + City + "' and Station='" + Station + "' ) SELECT 1 ELSE SELECT 0"));
+                if (superstationCount != 0)
+                    m_Database.Execute("delete " + tablename + " where StartTime = '" + start + "' and  Type ='" + Type + "' and City ='" + City + "' and Station='" + Station + "'");
+
+                for (int i = 1; i < row.Table.Columns.Count; i++)
+                {
+                    string colummname = row.Table.Columns[i].ColumnName;
+                    if (colummname.Contains("Column"))
+                        continue;
+                    int itemcode = -1;
+                    double value = Convert.ToDouble(row[i].ToString() != "" ? row[i].ToString() : "999");
+                    if (value == 999)
+                        value = -99;
+                    try
+                    {
+                        if (Type == "VOCs")
+                            itemcode = int.Parse(this.Table_Item.Select("Name = '" + colummname + "'")[0]["Item"].ToString());
+                        else
+                            itemcode = int.Parse(Table_Item.Select("Type = '"+ Type +"' and MC = '" + colummname + "'")[0]["DM"].ToString());
+                    }
+                    catch
+                    {
+                        maxdm = maxdm + 1;
+                        string insertsql = " insert into D_ItemCode ([DM], [MC] ,[Type])  values (" + maxdm + ",'" + colummname + "','" + Type + "')";
+                        if (Type == "VOCs" || Type == "颗粒")
+                            insertsql += "; insert into D_ModelAnalysis_Item ([DM], [MC] ,[DP])  values (" + maxdm + ",'" + colummname + "','" + Type + "')";
+                        m_Database.Execute(insertsql);
+                        itemcode = maxdm;
+                        LogManager.WriteLog(LogFile.SQL, "插入新的ItemCode：" + itemcode + ", MC：" + colummname);
+
+                        if (Type == "VOCs")
+                            Table_Item = m_Database.GetDataTable("select * from D_VOCItem");
+                        else
+                            Table_Item = m_Database.GetDataTable("select * from D_ItemCode");
+                    }
+                    SuperItem item = new SuperItem("", value, itemcode, "");
+                    Items.Add(colummname, item);
+                }
+                string sqlinsert = "";
+                foreach (SuperItem item in Items.Values)
+                {
+                    sqlinsert = sqlinsert + string.Format("insert into " + tablename + " (StartTime,EndTime,City,Station,Item,Value,Quality,Type,DValue) values('{0}','{1}','{2}','{3}',{4},{5},'{6}','{7}',{8});", start, end, City, Station, item.Item, item.Value, item.Quality, Type, item.Value);
+                }
+                m_Database.Execute(sqlinsert);
+            }
+            catch(Exception ex)
+            {
+                LogManager.WriteLog("超级站外部(多列)数据入库：Type =" + Type, ex);
+            }
+        }
+        #endregion
+
+        //获取类型最后更新时间
+        private DateTime GetInitialStarttime(string tabelname)
+        {
+            string strlasttime =
+                            m_Database.GetFirstValue("select max(StartTime) from  " + tabelname + " where  Type='" + Type + "'");
+            DateTime lasttime;
+            if (DateTime.TryParse(strlasttime, out lasttime))
+                return lasttime;
+            else
+                return InitialLST;
         }
 
         private class SuperItem
@@ -378,27 +418,6 @@ namespace Utility.SuperStation
             }
 
         }
-        /// <summary>
-        /// 源类
-        /// </summary>
-        private enum TypeCode
-        {
-            建筑涂料使用 = 7,
-            民用燃烧源 = 9,
-            餐饮油烟 = 0,
-            建筑施工 = 6,
-            农业机械 = 10,
-            污水处理 = 11,
-            垃圾填埋 = 12,
-            干洗 = 14,
-            家用溶剂 = 13,
-            油气挥发 = 15,
-            道路扬尘 = 8,
-            畜禽养殖=16,
-            氮肥施用=22,
-            土壤本底 = 23,
-            人体粪便 = 24,
-        };
         /// <summary>
         /// 枚举污染物编号
         /// </summary>
@@ -450,30 +469,6 @@ namespace Utility.SuperStation
                 stime = upTime;
             }
             return stime;
-        }
-        public int GetCityCode(string city, string province)
-        {
-            try
-            {
-                int code = Convert.ToInt32(m_Database.GetFirstValue("SELECT  [Code]  FROM [D_SourceCity] where  CityName='" + city + "' and  Province='" + province + "'"));
-                return code;
-            }
-            catch { return -1; }
-        }
-        public int GetParameterID(string items)
-        {
-            try
-            {
-                int code = Convert.ToInt32(m_Database.GetFirstValue("SELECT  DM  FROM [D_SourceLevelPar] where  Parameter='" + items + "'"));
-                return code;
-            }
-            catch
-            {
-                int maxcode = Convert.ToInt32(m_Database.GetFirstValue("SELECT max( DM)  FROM [D_SourceLevelPar]"));
-                string insetsql = "insert into D_SourceLevelPar values (" + ++maxcode + ",'" + items + "')";
-                m_Database.Execute(insetsql);
-                return maxcode;
-            }
         }
 
         public static DataTable ExcelToDS(string Path, string SheetName)
@@ -527,6 +522,7 @@ namespace Utility.SuperStation
             }
             catch (Exception vErr)
             {
+                LogManager.WriteLog(vErr);
                 return null;
             }
         }

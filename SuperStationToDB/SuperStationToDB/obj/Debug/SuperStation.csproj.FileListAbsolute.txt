@@ -18,3 +18,9 @@ E:\DitingProject\SuperStationToDB\SuperStationToDB\bin\Debug\DBUtility.dll
 E:\DitingProject\SuperStationToDB\SuperStationToDB\obj\Debug\ResolveAssemblyReference.cache
 E:\DitingProject\SuperStationToDB\SuperStationToDB\obj\Debug\SuperStationToDB.dll
 E:\DitingProject\SuperStationToDB\SuperStationToDB\obj\Debug\SuperStationToDB.pdb
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\bin\Debug\SuperStationToDB.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\bin\Debug\SuperStationToDB.pdb
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\bin\Debug\ChinaAirUtility.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\bin\Debug\DBUtility.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\obj\Debug\SuperStationToDB.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\SuperStationToDB\obj\Debug\SuperStationToDB.pdb

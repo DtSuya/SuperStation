@@ -40,5 +40,12 @@ E:\DitingProject\SuperStationToDB\ExecuteSStoDB\bin\Debug\SuperStationToDB.dll
 E:\DitingProject\SuperStationToDB\ExecuteSStoDB\bin\Debug\SuperStationToDB.pdb
 E:\DitingProject\SuperStationToDB\ExecuteSStoDB\obj\Debug\ResolveAssemblyReference.cache
 E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\ExecuteSStoDB.exe.config
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\obj\Debug\ExecuteSStoDB.csprojResolveAssemblyReference.cache
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\ExecuteSStoDB.exe
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\ExecuteSStoDB.pdb
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\ChinaAirUtility.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\DBUtility.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\SuperStationToDB.dll
+E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\bin\Debug\SuperStationToDB.pdb
 E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\obj\Debug\ExecuteSStoDB.exe
 E:\1Readearth\S四川环科院\超级站\SuperStationToDB\ExecuteSStoDB\obj\Debug\ExecuteSStoDB.pdb
